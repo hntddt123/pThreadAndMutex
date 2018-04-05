@@ -19,23 +19,27 @@
 using namespace std;
 
 static int tunnelStatus = 0;
-static int sequenceNumber = 0;
+static int whittierBound = 0;
+static int BigBearBound = 0;
+static int carNumber = 0;
 static string direction;
 
 void* carThread(void* data) {
     static pthread_mutex_t permit;
     static pthread_cond_t ok = PTHREAD_COND_INITIALIZER;
-    pthread_cond_wait(&ok, &permit);
     pthread_mutex_init(&permit, NULL);
+    //Critital Section
     pthread_mutex_lock(&permit);
-
-    cout << "Car #" << sequenceNumber << endl;
+    while (tunnelStatus == 1) {
+        pthread_cond_wait(&ok, &permit);
+    }
+    cout << "Car #" << carNumber << endl;
     if (tunnelStatus == 0) {
         cout << "going to Whittier arrives at the tunnel." << endl;
-    } else {
+    }else{
         cout << "going to Big bear arrives at the tunnel." << endl;
     }
-    sequenceNumber++;
+    carNumber++;
     pthread_cond_signal(&ok);
     pthread_mutex_unlock(&permit);
     
@@ -44,11 +48,11 @@ void* carThread(void* data) {
 
 void* tunnelThread(void* data) {
     while (0) {
-        tunnelStatus = 1;
-        cout << "Bound for Big Bear" << endl;
-        sleep(5);
         tunnelStatus = 0;
         cout << "Bound for Whittier" << endl;
+        sleep(5);
+        tunnelStatus = 1;
+        cout << "Bound for Big Bear" << endl;
         sleep(5);
     }
     pthread_exit(0);
@@ -81,10 +85,10 @@ int main(int argc, const char * argv[]) {
     pthread_t tid;
     pthread_t carTid[maxCars];
     //Create Tunnel thread
-    pthread_create(&tid, NULL, tunnelThread, &tunnelStatus);
+    pthread_create(&tid, NULL, tunnelThread, &maxCars);
     //create car threads
     for (int i=0; i<maxCars; i++) {
-        pthread_create(&carTid[i], NULL, carThread, &sequenceNumber);
+        pthread_create(&carTid[i], NULL, carThread, &carNumber);
     }
     //Wait for other car threads
     for (int i=0; i<maxCars; i++) {
