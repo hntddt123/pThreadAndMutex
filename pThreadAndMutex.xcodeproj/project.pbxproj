@@ -23,6 +23,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C3315FC6208AE3640094D013 /* input31.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = input31.txt; sourceTree = "<group>"; };
+		C3315FC7208AE3640094D013 /* output3a.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = output3a.txt; sourceTree = "<group>"; };
+		C3315FC8208AE3640094D013 /* input3b.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = input3b.txt; sourceTree = "<group>"; };
+		C3315FC9208AE3640094D013 /* output3b.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = output3b.txt; sourceTree = "<group>"; };
+		C3315FCA208AE3640094D013 /* input3a.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = input3a.txt; sourceTree = "<group>"; };
 		C33EA96520717D6500A44A8D /* pThreadAndMutex */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = pThreadAndMutex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C33EA96820717D6500A44A8D /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		C3D362912074230F0010E876 /* Input30.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Input30.txt; sourceTree = "<group>"; };
@@ -59,7 +64,12 @@
 			isa = PBXGroup;
 			children = (
 				C33EA96820717D6500A44A8D /* main.cpp */,
+				C3315FCA208AE3640094D013 /* input3a.txt */,
+				C3315FC8208AE3640094D013 /* input3b.txt */,
+				C3315FC7208AE3640094D013 /* output3a.txt */,
+				C3315FC9208AE3640094D013 /* output3b.txt */,
 				C3D362912074230F0010E876 /* Input30.txt */,
+				C3315FC6208AE3640094D013 /* input31.txt */,
 			);
 			path = pThreadAndMutex;
 			sourceTree = "<group>";

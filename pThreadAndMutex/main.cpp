@@ -16,154 +16,145 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <string>
-#include <vector>
 
 using namespace std;
 
-struct CarNode {
+struct Car {
     int carNumber;
-    int arriveTime;
     int passingTime;
     string direction;
 };
 
-static time_t start = time(0);
 static pthread_cond_t ok;
-static pthread_cond_t wb;
-static pthread_cond_t bb;
-
-static pthread_mutex_t permit;
-static vector<CarNode> carVector;
+static pthread_mutex_t trafficLock;
 static string tunnelStatus = "";
-static int maxTunnelCars = 0;
-static int whittierBound = 0;
-static int bigBearBound = 0;
-static int waitCars = 0;
+static Car cars[128];
+static int maxCarsInTunnel = 0;
+static int carsInTunnel = 0;
+static int carCountWB = 0;
+static int carCountBB = 0;
+static int waitingCars = -1;
+static int done = 0;
 
-void* carThread(void* carId) {
-    int id = *((int *) carId);
-    static int secondsPassed;
-    static int carsInTunnel = 0;
+void arriveTunnel(int carNo, string direction) {
+    cout << "Car #" <<  carNo << " going to " << direction << " arrives at the tunnel" << endl;
+    if (direction == "Whittier") {
+        carCountWB++;
+    } else {
+        carCountBB++;
+    }
+}
+
+void enterTunnel(int carNo, string direction) {
+    carsInTunnel++;
+    cout << "Car #" <<  carNo << " going to " << direction <<  " enters the tunnel" << endl;
+}
+
+void exitTunnel(int carNo) {
+    pthread_mutex_lock(&trafficLock);
+    carsInTunnel--;
+    pthread_cond_broadcast(&ok);
+    cout << "Car #" <<  carNo << " exits the tunnel" << endl;
+    pthread_mutex_unlock(&trafficLock);
+}
+
+void* carThread(void* car) {
+    Car newCar = *((Car*) car);
+    
     //Print a arrive message
-    if (carVector[id].direction == "WB") {
-        secondsPassed = difftime(time(0), start);
-        cout << "Car #" <<  carVector[id].carNumber << " going to Whittier arrives at the tunnel at time:" << secondsPassed << endl;
-        whittierBound++;
-    }else if (carVector[id].direction == "BB") {
-        secondsPassed = difftime(time(0), start);
-        cout << "Car #" <<  carVector[id].carNumber << " going to Big bear arrives at the tunnel at time:" << secondsPassed << endl;
-        bigBearBound++;
-    }
-    //Critital Section
-    pthread_mutex_lock(&permit);
+    arriveTunnel(newCar.carNumber, newCar.direction);
+    
+    pthread_mutex_lock(&trafficLock);
     //Wait Until it can enter the tunnel
-    while (maxTunnelCars < carsInTunnel) {
-        pthread_cond_wait(&ok, &permit);
-        waitCars++;
+    if (carsInTunnel >= maxCarsInTunnel) {
+        waitingCars++;
     }
-    while ((carVector[id].direction == "WB" && carVector[id].direction != tunnelStatus)) {
-        //cout << "Car #" << carVector[id].carNumber << " going to WB have to wait" << endl;
-        pthread_cond_wait(&wb, &permit);
-    }
-    while ((carVector[id].direction == "BB" && carVector[id].direction != tunnelStatus)) {
-        //cout << "Car #" << carVector[id].carNumber << " going to BB have to wait" << endl;
-        pthread_cond_wait(&bb, &permit);
+    while (!(tunnelStatus == newCar.direction && carsInTunnel < maxCarsInTunnel)) {
+        pthread_cond_wait(&ok, &trafficLock);
     }
     //Print enter the tunnel message
-    if (carVector[id].direction == "WB") {
-        secondsPassed = difftime(time(0), start);
-        cout << "Car #" <<  carVector[id].carNumber << " going to Whittier enters the tunnel at time:" << secondsPassed << endl;
-        carsInTunnel++;
-        //sleep for cross tunnel time
-        sleep(carVector[id].passingTime);
-    }else if (carVector[id].direction == "BB") {
-        secondsPassed = difftime(time(0), start);
-        cout << "Car #" <<  carVector[id].carNumber << " going to Big bear enters the tunnel at time:" << secondsPassed << endl;
-        carsInTunnel++;
-        //sleep for cross tunnel time
-        sleep(carVector[id].passingTime);
-    }
-    //Print exits the tunnel message
-    secondsPassed = difftime(time(0), start);
-    cout << "Car #" <<  carVector[id].carNumber << " exits the tunnel at time:" << secondsPassed << endl;
-    carsInTunnel--;
-    pthread_mutex_unlock(&permit);
-    pthread_cond_signal(&ok);
-    //End of critital section
+    enterTunnel(newCar.carNumber, newCar.direction);
+    pthread_mutex_unlock(&trafficLock);
+    
+    //sleep for cross tunnel time
+    sleep(newCar.passingTime);
+    
+    //Exit the tunnel
+    exitTunnel(newCar.carNumber);
+    
     //Terminate pthread
-    pthread_exit((void*)0);
+    pthread_exit(0);
 }
 
 void* tunnelThread(void* data) {
-    while (1) {
-        tunnelStatus = "WB";
-        cout << "---Bound for Whittier---" << endl;
-        pthread_cond_broadcast(&wb);
+    while (done == 0) {
+        pthread_mutex_lock(&trafficLock);
+        tunnelStatus = "Whittier";
+        cout << "The tunnel is now open for Whittier-bound traffic." << endl;
+        pthread_cond_broadcast(&ok);
+        pthread_mutex_unlock(&trafficLock);
         sleep(5);
+        pthread_mutex_lock(&trafficLock);
         tunnelStatus = "NO";
-        cout << "---No traffic allowed---" << endl;
+        cout << "The tunnel is now closed to ALL traffic." << endl;
+        pthread_mutex_unlock(&trafficLock);
         sleep(5);
-        tunnelStatus = "BB";
-        cout << "---Bound for Big Bear---" << endl;
-        pthread_cond_broadcast(&bb);
+        pthread_mutex_lock(&trafficLock);
+        tunnelStatus = "Big bear";
+        cout << "The tunnel is now open for Bear Valley-bound traffic." << endl;
+        pthread_cond_broadcast(&ok);
+        pthread_mutex_unlock(&trafficLock);
         sleep(5);
+        pthread_mutex_lock(&trafficLock);
         tunnelStatus = "NO";
-        cout << "---No traffic allowed---" << endl;
+        cout << "The tunnel is now closed to ALL traffic." << endl;
+        pthread_mutex_unlock(&trafficLock);
         sleep(5);
     }
+    return 0;
 }
 
 int main(int argc, const char * argv[]) {
     //Let Xcode I/O redirection comment out when using shell
-    freopen("input3b.txt","r",stdin);
+    //freopen("input3b.txt","r",stdin);
     
     int arriveTime = 0;
     int passingTime = 0;
-    int totalCars = 1;
-    string direction;
-    CarNode car;
+    int maxCars = 128;
+    string direction = "";
     
-    cin >> maxTunnelCars;
-    cout << "Maximum cars in tunnel:"  << maxTunnelCars << endl;
+    cin >> maxCarsInTunnel;
+    cout << "Maximum cars in tunnel:"  << maxCarsInTunnel << endl;
     
-    //read input text
-    while (cin >> arriveTime >> direction >> passingTime) {
-        car.carNumber = totalCars;
-        car.arriveTime = arriveTime;
-        car.passingTime = passingTime;
-        car.direction = direction;
-        carVector.push_back(car);
-        totalCars++;
-    }
-    totalCars--;
-    cout << "Total Cars:" << totalCars << endl;
-    for (int i=0; i<totalCars; i++) {
-        cout << "Car#" << carVector[i].carNumber << " " << carVector[i].arriveTime << " " << carVector[i].passingTime << " " << carVector[i].direction << endl;
-    }
     //Thread part
     pthread_t tid;
-    pthread_t carTid[totalCars];
-    pthread_mutex_init(&permit, NULL);
+    pthread_t cartid[maxCars];
+    pthread_mutex_init(&trafficLock, NULL);
     pthread_cond_init(&ok, NULL);
-    pthread_cond_init(&wb, NULL);
-    pthread_cond_init(&bb, NULL);
-
+    
     //Create Tunnel thread
-    pthread_create(&tid, NULL, tunnelThread, &totalCars);
-    //Create car threads
-    for (int i=0; i<totalCars; i++) {
-        //cout << "Thread:" << carTid[i] << endl;
-        sleep(carVector[i].arriveTime);
-        int id = i;
-        pthread_create(&carTid[i], NULL, carThread, &id);
+    pthread_create(&tid, NULL, tunnelThread, &done);
+    
+    int count = 1;
+    //read input text
+    while (cin >> arriveTime >> direction >> passingTime) {
+        cars[count].carNumber = count;
+        cars[count].direction = direction;
+        (cars[count].direction == "WB") ? cars[count].direction = "Whittier" : cars[count].direction = "Big bear";
+        cars[count].passingTime = passingTime;
+        sleep(arriveTime);
+        //Create car threads
+        pthread_create(&cartid[count], NULL, carThread, &cars[count]);
+        count++;
     }
     //Wait for other car threads
-    for (int i=0; i<totalCars; i++) {
-        pthread_join(carTid[i], NULL);
+    for (int i=0; i<=count; i++) {
+        pthread_join(cartid[i], NULL);
     }
-    cout << whittierBound << " car(s) going to Whittier arrived at the tunnel" << endl;
-    cout << bigBearBound << " car(s) going to Bear Valley arrived at the tunnel" << endl;
-    cout << waitCars << " car(s) had to wait because the tunnel was full" << endl;
+    done = 1;
+    cout << carCountWB << " car(s) going to Whittier arrived at the tunnel" << endl;
+    cout << carCountBB << " car(s) going to Bear Valley arrived at the tunnel" << endl;
+    cout << waitingCars << " car(s) were delayed." << endl;
     
     return 0;
 }
