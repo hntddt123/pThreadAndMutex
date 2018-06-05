@@ -28,12 +28,11 @@ struct Car {
 static pthread_cond_t ok;
 static pthread_mutex_t trafficLock;
 static string tunnelStatus = "";
-static Car cars[128];
 static int maxCarsInTunnel = 0;
 static int carsInTunnel = 0;
 static int carCountWB = 0;
 static int carCountBB = 0;
-static int waitingCars = -1;
+static int waitingCars = 0;
 static int done = 0;
 
 void arriveTunnel(int carNo, string direction) {
@@ -61,12 +60,12 @@ void exitTunnel(int carNo) {
 void* carThread(void* car) {
     Car newCar = *((Car*) car);
     
+    pthread_mutex_lock(&trafficLock);
     //Print a arrive message
     arriveTunnel(newCar.carNumber, newCar.direction);
     
-    pthread_mutex_lock(&trafficLock);
     //Wait Until it can enter the tunnel
-    if (carsInTunnel >= maxCarsInTunnel) {
+    if (carsInTunnel >= maxCarsInTunnel && tunnelStatus == newCar.direction) {
         waitingCars++;
     }
     while (!(tunnelStatus == newCar.direction && carsInTunnel < maxCarsInTunnel)) {
@@ -111,13 +110,13 @@ void* tunnelThread(void* data) {
         pthread_mutex_unlock(&trafficLock);
         sleep(5);
     }
-    return 0;
+    pthread_exit(0);
 }
 
 int main(int argc, const char * argv[]) {
     //Let Xcode I/O redirection comment out when using shell
-    //freopen("input3b.txt","r",stdin);
-    
+    freopen("input3a.txt","r",stdin);
+
     int arriveTime = 0;
     int passingTime = 0;
     int maxCars = 128;
@@ -136,11 +135,12 @@ int main(int argc, const char * argv[]) {
     pthread_create(&tid, NULL, tunnelThread, &done);
     
     int count = 1;
+    Car cars[128];
     //read input text
     while (cin >> arriveTime >> direction >> passingTime) {
         cars[count].carNumber = count;
         cars[count].direction = direction;
-        (cars[count].direction == "WB") ? cars[count].direction = "Whittier" : cars[count].direction = "Big bear";
+        (cars[count].direction == "WB") ? (cars[count].direction = "Whittier") : (cars[count].direction = "Big bear");
         cars[count].passingTime = passingTime;
         sleep(arriveTime);
         //Create car threads
@@ -148,7 +148,7 @@ int main(int argc, const char * argv[]) {
         count++;
     }
     //Wait for other car threads
-    for (int i=0; i<=count; i++) {
+    for (int i=1; i<count; i++) {
         pthread_join(cartid[i], NULL);
     }
     done = 1;
